@@ -1,0 +1,11 @@
+# Environment variables and local secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# Dependencies and build outputs
+node_modules/
+dist/
+

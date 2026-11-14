@@ -1,0 +1,277 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ModuleCode {
+  FINANCE
+  INVENTORY
+  PROCUREMENT
+  SALES
+  CRM
+  HR_PAYROLL
+  MANUFACTURING
+  SUPPLY_CHAIN
+  PROJECTS
+  QUALITY
+  ASSETS_MAINTENANCE
+  BI_REPORTING
+  SETTINGS
+}
+
+enum ActionPermission {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+  APPROVE
+  EXPORT
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  DROPDOWN
+  MULTI_SELECT
+  CHECKBOX
+  FILE
+  FORMULA
+}
+
+model Company {
+  id             String                 @id @default(uuid())
+  code           String                 @unique
+  name           String
+  legalName      String?
+  taxNumber      String?
+  currency       String                 @default("USD")
+  fiscalYearStart Int                   @default(1) // Month: 1 = Jan, 4 = April
+  timezone       String                 @default("UTC")
+  logoUrl        String?
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  isDeleted      Boolean                @default(false)
+  deletedAt      DateTime?
+
+  branches       Branch[]
+  users          User[]
+  roles          Role[]
+  moduleSettings CompanyModuleSetting[]
+  customFields   CustomFieldDefinition[]
+  systemSettings SystemSetting[]
+  auditLogs      AuditLog[]
+
+  @@index([code])
+}
+
+model Branch {
+  id        String    @id @default(uuid())
+  companyId String
+  code      String
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  postalCode String?
+  phone     String?
+  email     String?
+  isHeadquarters Boolean @default(false)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users     User[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+model CompanyModuleSetting {
+  id         String     @id @default(uuid())
+  companyId  String
+  moduleCode ModuleCode
+  isEnabled  Boolean    @default(true)
+  config     Json?      // Module-specific JSON config
+  updatedAt  DateTime   @updatedAt
+  updatedBy  String?
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, moduleCode])
+  @@index([companyId])
+}
+
+model User {
+  id               String       @id @default(uuid())
+  companyId        String
+  branchId         String?
+  email            String       @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  phone            String?
+  avatarUrl        String?
+  isActive         Boolean      @default(true)
+  isSuperAdmin     Boolean      @default(false)
+  twoFactorEnabled Boolean      @default(false)
+  twoFactorSecret  String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  createdBy        String?
+  updatedBy        String?
+  isDeleted        Boolean      @default(false)
+  deletedAt        DateTime?
+
+  company          Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch           Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  userRoles        UserRole[]
+  auditLogs        AuditLog[]
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([email])
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  isDeleted   Boolean      @default(false)
+  deletedAt   DateTime?
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  permissions Permission[]
+  userRoles   UserRole[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Permission {
+  id         String           @id @default(uuid())
+  roleId     String
+  moduleCode ModuleCode
+  action     ActionPermission
+  isAllowed  Boolean          @default(true)
+  fieldScope Json?            // Specific field restrictions or attributes
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  role       Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleCode, action])
+  @@index([roleId])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  companyId  String
+  userId     String?
+  moduleCode String
+  entityName String
+  entityId   String
+  action     String   // e.g. CREATE, UPDATE, DELETE, APPROVE, REJECT
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([entityName, entityId])
+  @@index([createdAt])
+}
+
+model CustomFieldDefinition {
+  id                String          @id @default(uuid())
+  companyId         String
+  moduleCode        ModuleCode
+  entityName        String          // e.g., "Customer", "Invoice", "PurchaseOrder"
+  fieldName         String          // e.g., "gstin_verified", "delivery_tier"
+  fieldLabel        String
+  fieldType         CustomFieldType
+  isRequired        Boolean         @default(false)
+  isVisible         Boolean         @default(true)
+  displayOrder      Int             @default(0)
+  options           Json?           // Options for dropdown or multi-select: ["Option A", "Option B"]
+  defaultValue      String?
+  formulaExpression String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  values            CustomFieldValue[]
+
+  @@unique([companyId, entityName, fieldName])
+  @@index([companyId, entityName])
+}
+
+model CustomFieldValue {
+  id            String                @id @default(uuid())
+  fieldDefId    String
+  entityId      String                // ID of the target record in any module table
+  value         Json                  // JSON supports string, number, array, boolean, date
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  definition    CustomFieldDefinition @relation(fields: [fieldDefId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldDefId, entityId])
+  @@index([entityId])
+  @@index([fieldDefId])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  companyId String
+  category  String   // e.g. "TAX", "CURRENCY", "NUMBERING", "THEME"
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+}
+
