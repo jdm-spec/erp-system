@@ -1,0 +1,26 @@
+{
+  "name": "modular-customizable-erp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise-grade, modular, fully customizable ERP Management System",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:backend": "npm run dev --workspace=@erp/backend",
+    "dev:frontend": "npm run dev --workspace=@erp/frontend",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run prisma:generate --workspace=@erp/backend",
+    "db:migrate": "npm run prisma:migrate --workspace=@erp/backend",
+    "db:seed": "npm run prisma:seed --workspace=@erp/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+
